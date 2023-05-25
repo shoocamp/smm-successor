@@ -1,1 +1,1 @@
-# smm-sucessor
+# smm-successor
