@@ -1,10 +1,10 @@
 from fastapi import FastAPI
-from api import video_router
+from api import api_router
 
 
 app = FastAPI()
 
-app.include_router(video_router)
+app.include_router(api_router)
 
 if __name__ == "__main__":
     import uvicorn

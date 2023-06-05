@@ -6,13 +6,10 @@ file_path = '/Users/sergeyzaitsev/PycharmProjects/smm-successor/video_content/Ti
 video = {
     'title': 'My Video Title',
     'description': 'Video description',
-    'target_platform': 'YouTube',
+    'target_platform': 'youtube',
     'time_to_publish': '2023-06-01T12:00:00Z'
 }
 
-
-
-# print(video['title'])
 
 files = {'file': open(file_path, 'rb')}
 
