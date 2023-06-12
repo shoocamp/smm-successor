@@ -4,14 +4,14 @@ from pydantic import BaseModel
 
 
 class TargetPlatform(str, Enum):
-    youtube = "youtube"
-    vk = "vk"
-    both = "both"
+    youtube = "YOUTUBE"
+    vk = "VK"
+    both = "ALL PLATFORMS"
 
 
 class VideoInfo(BaseModel):
     title: str
     description: str
-    target_platform: TargetPlatform = str
+    target_platform: str
     time_to_publish: str
 

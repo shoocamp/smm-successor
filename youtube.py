@@ -1,5 +1,3 @@
-from __future__ import print_function
-
 import os
 
 import googleapiclient.discovery
@@ -14,20 +12,17 @@ from google.oauth2.credentials import Credentials
 from google_auth_oauthlib.flow import InstalledAppFlow
 
 
+SCOPES = ["https://www.googleapis.com/auth/youtube.upload"]
 
-SCOPES = ["https://www.googleapis.com/auth/youtube.upload",
-          "https://www.googleapis.com/auth/youtube.force-ssl"]
 
-# file = '/Users/sergeyzaitsev/PycharmProjects/smm-successor/video_content/Timeline 1.mov'
-
-def upload(file):
+def upload(file, title, description):
     # Disable OAuthlib's HTTPS verification when running locally.
     # *DO NOT* leave this option enabled in production.
     os.environ["OAUTHLIB_INSECURE_TRANSPORT"] = "1"
 
     api_service_name = "youtube"
     api_version = "v3"
-    client_secrets_file = "/Users/sergeyzaitsev/PycharmProjects/smm-successor/youtube_auth/client_secret_file.json"
+    client_secrets_file = "/Users/sergeyzaitsev/PycharmProjects/smm-successor/youtube_auth/client_secret_2.json"
 
     # Get credentials and create an API client
     creds = None
@@ -36,14 +31,18 @@ def upload(file):
     # time.
     if os.path.exists('token.json'):
         creds = Credentials.from_authorized_user_file('token.json', SCOPES)
+        print("1exist?", creds, "valid?", creds.valid)
     # If there are no (valid) credentials available, let the user log in.
     if not creds or not creds.valid:
-        if creds and creds.expired and creds.refresh_token:
+        print("2exist?", creds, "valid?", creds.valid)
+        if creds and creds.expired and creds.refresh_token:  # можно попробовать добить not к creds.expired оригинальному коду
+            print("3exist?", creds, "valid?", creds.valid)
             creds.refresh(Request())
         else:
             flow = InstalledAppFlow.from_client_secrets_file(
                 client_secrets_file, SCOPES)
             creds = flow.run_local_server(port=0)
+            print("4exist?", creds, "valid?", creds.valid)
         # Save the credentials for the next run
         with open('token.json', 'w') as token:
             token.write(creds.to_json())
@@ -51,18 +50,18 @@ def upload(file):
         api_service_name, api_version, credentials=creds)
 
     request = youtube.videos().insert(
-        part="snippet,status",   ##  этого не было в примере с OAuth, но было в примере с API KEY
-        body={},
-
-        # TODO: For this request to work, you must replace "YOUR_FILE"
-        #       with a pointer to the actual file you are uploading.
+        part="snippet,status",
+        body={
+            "snippet": {
+                "title": f"{title}",
+                "description": f"{description}"
+            },
+            "status": {
+                "privacyStatus": "private"
+            }
+        },
         media_body=MediaFileUpload(file)
     )
     response = request.execute()
 
     return response
-
-
-if __name__ == "__main__":
-    upload()
-

@@ -1,0 +1,4 @@
+# Сервисный ключ доступа	 83781d6183781d6183781d615a806c34308837883781d61e712600c01f15bd14e382be2
+token = 'vk1.a.krATaxN7BLFd4So8q0cwZ8tOzMpQVY5lynrWu16sLwSnf7m3HPqlLxBNAgJXN2cmmDfuyk4N1jYEoJUCKd70U5tue2QAc_5fmjpl-aeheZKKuCyUqqND6WJY1Ctv-e4w8-ITvTwY_g1KSXMhVkCP_J_UzCDXst6IAKQ8hqEJgi3XwHGyw3HYUbNDEJaYl_PHbCwY3d8rb7bkuQIypS7WJA'
+token_o = 'vk1.a.6dPEUy8FP5I9MwkliDB3O9G9FMqkVL8yN6GTT1vZuLrp0Dg_CtdZgvEcRbHAXbtpCmSODsbmyTlo7vSc7JVTDp0nqwK5BYDTL-ghGkwCT4uhKg8lXLODOcogmQBA4GOS_cTpZdUsvQeTQun4GXB7Wa8HOFCVG8XsrcvV7y4v4DbzABvXHMStB1x-LO73HlgPn-2yewLBEjW0Kbi4D54ObQ'
+oauth_url = 'https://oauth.vk.com/authorize?client_id=51652945&display=page&redirect_uri=https://oauth.vk.com/blank.html&scope=video,offline&response_type=token&v=5.131&state=123456'

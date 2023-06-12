@@ -1,4 +1,4 @@
-from models import VideoInfo
+from app_models import VideoInfo
 
 
 class VideoFile:

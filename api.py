@@ -1,14 +1,15 @@
 from fastapi import UploadFile, File, Form, APIRouter
-from models import VideoInfo, TargetPlatform
+from app_models import VideoInfo, TargetPlatform
 import toml
 from db import Storage
 from youtube import upload
-
+from vk import vk_upload
 api_router = APIRouter()
 
 conf = toml.load("/Users/sergeyzaitsev/PycharmProjects/smm-successor/db_config.toml")
 storage = Storage(uri=conf["database"]["uri"])
-user_id = 1
+user_id = 2
+
 
 @api_router.post("/api/v1/upload_video")
 def upload_video(title=Form(...),
@@ -29,7 +30,17 @@ def upload_video(title=Form(...),
 
     x = storage.add_info_and_path(user_id=user_id, info=dict(info), path=file_path)
 
-    you = upload(file_path)
+    if info.target_platform == 'ALL':
+        vk = vk_upload(file_path, title=info.title, description=info.description)
+        youtube = upload(file_path, title=info.title, description=info.description)
+        return x, youtube, vk
 
-    return x, you
+    elif info.target_platform == 'VK':
+        vk = vk_upload(file_path, title=info.title, description=info.description)
+        return x, vk
+
+    else:
+        youtube = upload(file_path, title=info.title, description=info.description)
+        return x, youtube
+
 
