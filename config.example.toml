@@ -1,0 +1,11 @@
+[database]
+uri = "mongodb:///mongoadmin:secret@localhost:27017"
+
+[storage]
+path = "PATH_TO_STORE_USER_FILES"
+
+[youtube]
+secret_file_path = "PATH_TO_THE_SECRET_FILE"
+
+[vk]
+token = "VK_API_TOKEN"
