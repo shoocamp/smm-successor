@@ -5,6 +5,15 @@ from pathlib import Path
 from pydantic import BaseModel
 
 
+class User:
+    def __init__(self, db_id, username):
+        self.db_id = db_id
+        self.username = username
+
+    def __repr__(self):
+        return f"User({self.db_id}, {self.username}"
+
+
 class TargetPlatform(str, Enum):
     youtube = "YOUTUBE"
     vk = "VK"
