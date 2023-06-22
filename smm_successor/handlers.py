@@ -5,22 +5,20 @@ import secrets
 import toml
 from fastapi import UploadFile, File, Form, APIRouter, HTTPException, Depends, status
 from fastapi.security import HTTPBasic, HTTPBasicCredentials
-
 from typing_extensions import Annotated
 
-from db import Storage
-from models import VideoInfo, TargetPlatform, APIResponse
-from publishers import YoutubePublisher, VKPublisher
+from .db import Storage
+from .models import VideoInfo, TargetPlatform, APIResponse
+from .publishers import YoutubePublisher, VKPublisher
 
 api_router = APIRouter()
 
-conf = toml.load("/Users/sergeyzaitsev/PycharmProjects/smm-successor/smm_successor/config.toml")
+conf = toml.load("config.toml")
 
 storage = Storage(uri=conf["database"]["uri"])
 youtube_publisher = YoutubePublisher(conf['youtube']['secret_file_path'])
 vk_publisher = VKPublisher(conf['vk']['token'])
 
-# user_id = 2
 security = HTTPBasic()
 
 
@@ -85,7 +83,3 @@ def upload_video(user_id: Annotated[str, Depends(get_current_user_id)],
         raise HTTPException(402, f"Unsupported platform: '{info.target_platform}'")
 
     return APIResponse(result=result)
-
-
-# @api_router.post("/api/v1/show_uploaded")
-# def show_uploaded(user_id: Annotated[str, Depends(get_current_user_id)]):
