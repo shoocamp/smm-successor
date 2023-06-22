@@ -12,5 +12,5 @@
         -e MONGO_INITDB_ROOT_PASSWORD=secret \
         mongo
     ```
-4. Run `python smm_successor/server.py` or  `uvicorn smm_successor.server:app --reload`
+4. Run `uvicorn smm_successor.server:app --reload`
 5. Open `http://127.0.0.1:8000/docs`

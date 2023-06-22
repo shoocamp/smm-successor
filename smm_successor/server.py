@@ -2,7 +2,7 @@ import logging
 
 from fastapi import FastAPI
 
-from .handlers import api_router
+from smm_successor.handlers import api_router
 
 logging.basicConfig(format='%(asctime)s %(levelname)-8s %(name)-15s %(message)s', level=logging.INFO)
 

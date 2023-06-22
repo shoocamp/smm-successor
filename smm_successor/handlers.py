@@ -7,9 +7,9 @@ from fastapi import UploadFile, File, Form, APIRouter, HTTPException, Depends, s
 from fastapi.security import HTTPBasic, HTTPBasicCredentials
 from typing_extensions import Annotated
 
-from .db import Storage
-from .models import VideoInfo, TargetPlatform, APIResponse
-from .publishers import YoutubePublisher, VKPublisher
+from smm_successor.db import Storage
+from smm_successor.models import VideoInfo, TargetPlatform, APIResponse
+from smm_successor.publishers import YoutubePublisher, VKPublisher
 
 api_router = APIRouter()
 
