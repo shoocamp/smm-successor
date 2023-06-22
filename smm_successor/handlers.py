@@ -8,7 +8,7 @@ from fastapi.security import HTTPBasic, HTTPBasicCredentials
 from typing_extensions import Annotated
 
 from smm_successor.db import Storage
-from smm_successor.models import VideoInfo, TargetPlatform, APIResponse
+from smm_successor.models import VideoInfo, TargetPlatform, APIResponse, SignUp, User, LogIn
 from smm_successor.publishers import YoutubePublisher, VKPublisher
 
 api_router = APIRouter()
@@ -44,10 +44,17 @@ def get_current_user_id(
 
 
 @api_router.post("/api/v1/signup")
-def sign_up(name, password):
-    password_hash = hashlib.md5(password.encode()).hexdigest()
-    user_id = storage.create_new_user(name=name, password=password_hash)
-    return user_id
+def sign_up(data: SignUp) -> APIResponse:
+    password_hash = hashlib.md5(data.password.encode()).hexdigest()
+    user_id = storage.create_new_user(name=data.username, password=password_hash)
+    return APIResponse(result=User(user_id, data.username))
+
+@api_router.post("/api/v1/login")
+def sign_in(data: LogIn) -> APIResponse:
+    password_hash = hashlib.md5(data.password.encode()).hexdigest()
+    user_id = storage.get_user_id_by_name(name=data.username)
+    # TODO: check password, exchange to a token
+    return APIResponse(result=User(user_id, data.username))
 
 
 @api_router.post("/api/v1/upload_video")

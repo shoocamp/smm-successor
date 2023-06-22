@@ -1,6 +1,7 @@
 from datetime import datetime
 from enum import Enum
 from pathlib import Path
+from typing import Any
 
 from pydantic import BaseModel
 
@@ -12,6 +13,17 @@ class User:
 
     def __repr__(self):
         return f"User({self.db_id}, {self.username}"
+
+
+class SignUp(BaseModel):
+    username: str
+    password: str
+    email: str
+
+
+class LogIn(BaseModel):
+    password: str
+    username: str
 
 
 class TargetPlatform(str, Enum):
@@ -48,4 +60,4 @@ class ApiResponseStatus(Enum):
 
 class APIResponse(BaseModel):
     status: ApiResponseStatus = ApiResponseStatus.OK
-    result: dict
+    result: Any

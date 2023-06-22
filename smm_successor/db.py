@@ -46,14 +46,10 @@ class Storage:
         db = self.client["smm"]
         coll = db["users"]
         result = coll.find_one({"name": name})
-        print(result)
         return result["password"]
 
     def get_user_id_by_name(self, name):
         db = self.client["smm"]
         coll = db["users"]
         result = coll.find_one({"name": name})
-        print(result)
         return result["_id"]
-
-
