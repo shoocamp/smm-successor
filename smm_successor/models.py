@@ -26,7 +26,7 @@ class LogIn(BaseModel):
     username: str
 
 
-class TargetPlatform(str, Enum):
+class TargetPlatforms(str, Enum):
     youtube = "YOUTUBE"
     vk = "VK"
     all = "ALL PLATFORMS"
@@ -35,7 +35,6 @@ class TargetPlatform(str, Enum):
 class VideoInfo(BaseModel):
     title: str
     description: str
-    target_platform: str
     time_to_publish: datetime
 
 
@@ -47,9 +46,9 @@ class VideoStatus(str, Enum):
 
 
 class VideoFile(BaseModel):
-    db_id: str
     info: VideoInfo
     file_path: Path
+    target_platforms: list[TargetPlatforms]
     status: VideoStatus
 
 

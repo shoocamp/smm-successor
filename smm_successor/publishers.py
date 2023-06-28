@@ -108,3 +108,20 @@ class VKPublisher(Publisher):
         logger.info(f"[VK] '{file_path}' uploaded")
 
         return response.json()
+
+    # TODO: add logic for different quantity of parameters changing
+    def edit_data(self, video_id, new_title, new_description):
+        url = 'https://api.vk.com/method/video.edit'
+        params = {
+            'video_id': f'{video_id}',
+            'name': f'{new_title}',
+            'desc': f'{new_description}',
+            'access_token': f'{self.token}',
+            'v': '5.131'
+        }
+
+        response = requests.post(url, params=params)
+        print(response.content)
+        return response.text
+
+
