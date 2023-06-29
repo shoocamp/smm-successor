@@ -3,7 +3,27 @@ from enum import Enum
 from pathlib import Path
 from typing import Any
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
+
+
+class User:
+    def __init__(self, db_id, username):
+        self.db_id = db_id
+        self.username = username
+
+    def __repr__(self):
+        return f"User({self.db_id}, {self.username}"
+
+
+class SignUp(BaseModel):
+    username: str = Field(default=None, title="Username")
+    password: str = Field(default=None, title="Password")
+    email: str = Field(default=None, title="email")
+
+
+class LogIn(BaseModel):
+    password: str
+    username: str
 
 
 class User:
