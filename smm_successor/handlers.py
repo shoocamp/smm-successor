@@ -1,159 +1,184 @@
 import datetime
-import hashlib
-import secrets
+import logging
+from pathlib import Path
+from typing import List
 
-import toml
 from fastapi import UploadFile, File, Form, APIRouter, HTTPException, Depends, status
-from fastapi.security import HTTPBasic, HTTPBasicCredentials
+from fastapi.security import OAuth2PasswordRequestForm
+from starlette.responses import RedirectResponse
 from typing_extensions import Annotated
-from typing import Optional
 
+from smm_successor.auth import get_password_hash, ACCESS_TOKEN_EXPIRE_DAYS, \
+    create_access_token, authenticate_user, get_current_user
+from smm_successor.config import CONFIG
 from smm_successor.db import Storage
-from smm_successor.models import VideoStatus, VideoInfo, TargetPlatforms, APIResponse, SignUp, User, LogIn, VideoFile
+from smm_successor.models.user import UserInDB, BaseUser
+from smm_successor.models.video import SocialPlatform, VideoStatus, Video, VideoInfo, VideoInDB, VideoEdit
 from smm_successor.publishers import YoutubePublisher, VKPublisher
+
+logger = logging.getLogger(__name__)
 
 api_router = APIRouter()
 
-conf = toml.load("smm_successor/config.toml")
+storage = Storage(connection_uri=CONFIG["database"]["uri"])
 
-storage = Storage(uri=conf["database"]["uri"])
-youtube_publisher = YoutubePublisher(conf['youtube']['secret_file_path'])
-vk_publisher = VKPublisher(conf['vk']['token'])
+PUBLISHERS = {
+    SocialPlatform.vk: VKPublisher(CONFIG['vk']['token']),
+    SocialPlatform.youtube: YoutubePublisher(CONFIG['youtube']['secret_file_path']),
+}
 
-security = HTTPBasic()
 
-
-def get_current_user_id(
-        credentials: Annotated[HTTPBasicCredentials, Depends(security)]
+@api_router.post("/api/v1/users/signup")
+def sign_up(
+        username: Annotated[str, Form(...)],
+        password: Annotated[str, Form(...)],
+        email: Annotated[str, Form(...)]
 ):
-    current_username = credentials.username
-    current_password = credentials.password
-    password_hash = hashlib.md5(current_password.encode()).hexdigest()
-    password_from_db = storage.get_md5_pass_by_name(current_username)
-    is_correct_password = secrets.compare_digest(
-        password_hash, password_from_db
+    hashed_password = get_password_hash(password)
+    user = UserInDB(
+        username=username,
+        email=email,
+        hashed_password=hashed_password
     )
-    if not is_correct_password:
+
+    storage.create_new_user(user)
+    return RedirectResponse(url='/api/v1/users/signin')
+
+
+@api_router.post("/api/v1/users/signin")
+def sign_in(form_data: Annotated[OAuth2PasswordRequestForm, Depends()]):
+    user = authenticate_user(form_data.username, form_data.password)
+    if not user:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Incorrect name or password",
-            headers={"WWW-Authenticate": "Basic"},
+            detail="Incorrect username or password",
+            headers={"WWW-Authenticate": "Bearer"},
         )
-    user_name = credentials.username
-    user_id = storage.get_user_id_by_name(user_name)
-    return user_id
+    access_token_expires = datetime.timedelta(days=ACCESS_TOKEN_EXPIRE_DAYS)
+    access_token = create_access_token(
+        data={"sub": user.username}, expires_delta=access_token_expires
+    )
+    return {"access_token": access_token, "token_type": "bearer"}
 
 
-@api_router.post("/api/v1/signup")
-def sign_up(data: SignUp) -> APIResponse:
-    password_hash = hashlib.md5(data.password.encode()).hexdigest()
-    user_id = storage.create_new_user(name=data.username, password=password_hash)
-    return APIResponse(result=User(user_id, data.username))
+@api_router.get("/api/v1/users/info")
+def user_info(current_user: Annotated[UserInDB, Depends(get_current_user)]) -> BaseUser:
+    return current_user
 
 
-@api_router.post("/api/v1/login")
-def sign_in(data: LogIn) -> APIResponse:
-    password_hash = hashlib.md5(data.password.encode()).hexdigest()
-    user_id = storage.get_user_id_by_name(name=data.username)
-    # TODO: check password, exchange to a token
-    return APIResponse(result=User(user_id, data.username))
+@api_router.post("/api/v1/videos/")
+def upload_video(
+        current_user: Annotated[UserInDB, Depends(get_current_user)],
+        title: str = Form(...),
+        description: str = Form(...),
+        youtube: bool = Form(False),
+        vk: bool = Form(False),
+        time_to_publish: datetime.datetime = Form(datetime.datetime.now()),
+        file: UploadFile = File(...),
+) -> VideoInDB:
+    base_path = CONFIG['storage']['path']
+    file_path = Path(base_path, file.filename)
 
+    # ugly, think how to improve
+    target_platforms = []
+    if vk:
+        target_platforms.append(SocialPlatform.vk)
+    if youtube:
+        target_platforms.append(SocialPlatform.youtube)
 
-@api_router.post("/api/v1/upload_video")
-def upload_video(user_id: Annotated[str, Depends(get_current_user_id)],
-                 title=Form(...),
-                 description=Form(...),
-                 target_platforms: TargetPlatforms = Form(...),
-                 time_to_publish: datetime.datetime = Form(datetime.datetime.now()),
-                 file: UploadFile = File(...)) -> APIResponse:
-    file_data = VideoFile(
-        info=VideoInfo(title=title,
-                       description=description,
-                       time_to_publish=time_to_publish),
-        file_path=file.filename,
-        target_platforms=[target_platforms],
-        status='waiting'
+    incoming_video = Video(
+        owner_id=current_user.id,
+        info=VideoInfo(
+            title=title,
+            description=description,
+        ),
+        time_to_publish=time_to_publish,
+        file_path=str(file_path),
+        target_platforms=target_platforms,
+        status=VideoStatus.WAITING,
+        platform_status={},
     )
 
-    file_data_dict = {
-        'info': file_data.info.dict(),
-        'file_path': str(file_data.file_path),
-        'target_platforms': [tp.value for tp in file_data.target_platforms],
-        'status': file_data.status
-    }
-    with open(file.filename, "wb") as f:
+    # save a file locally
+    with file_path.open("wb") as f:
         f.write(file.file.read())
 
-    file_path = file.filename
+    # save meta info in a database
+    video_in_db = storage.add_video(incoming_video)
 
-    file_db = storage.add_file_data_to_db(user_id=user_id, file_data=file_data_dict)
+    # upload a file
+    for platform in target_platforms:
+        logger.info(f"Uploading video (id: {video_in_db.id}, user_id: {video_in_db.owner_id}) to {platform}")
 
-    record_filter = {'_id': file_db['_id']}
+        # set a video status
+        storage.update_video(video_in_db.id, {"status": VideoStatus.UPLOADING})
 
-    if file_data.target_platforms == [TargetPlatforms.all]:
-        vk_response = vk_publisher.upload(file_path, title=file_data.info.title,
-                                          description=file_data.info.description)
-        youtube_response = youtube_publisher.upload(file_path, title=file_data.info.title,
-                                                    description=file_data.info.description)
-        result = {"vk": vk_response, "youtube": youtube_response, "db": file_db}
+        # upload
+        platform_status = PUBLISHERS[platform].upload(video_in_db)
 
-        storage.update_file_data(record_filter, {'file_data.status': VideoStatus.UPLOADED})
-        storage.update_file_data(record_filter, {'vk': vk_response, 'youtube': youtube_response})
+        # update platform specific status
+        video_in_db.platform_status[platform] = platform_status
+        storage.update_video(video_in_db.id, {"platform_status": video_in_db.platform_status})
 
-    elif file_data.target_platforms == [TargetPlatforms.vk]:
-        vk_response = vk_publisher.upload(file_path, title=file_data.info.title,
-                                          description=file_data.info.description)
-        result = {"vk": vk_response, "db": file_db}
+        logger.info(f"Video (id: {video_in_db.id}, user_id: {video_in_db.owner_id}) uploaded to {platform} ")
 
-        storage.update_file_data(record_filter, {'file_data.status': VideoStatus.UPLOADED})
-        storage.update_file_data(record_filter, {'vk': vk_response})
+    # set a video status
+    storage.update_video(video_in_db.id, {"status": VideoStatus.UPLOADED})
 
-    elif file_data.target_platforms == [TargetPlatforms.youtube]:
-        youtube_response = youtube_publisher.upload(file_path, title=file_data.info.title,
-                                                    description=file_data.info.description)
-        result = {"youtube": youtube_response, "db": file_db}
-
-        storage.update_file_data(record_filter, {'status': VideoStatus.UPLOADED})
-        storage.update_file_data(record_filter, {'youtube': youtube_response})
-
-    else:
-        raise HTTPException(402, f"Unsupported platform: '{file_data.target_platforms}'")
-
-    return APIResponse(result=result)
+    return video_in_db
 
 
-@api_router.get("/api/v1/get_list_with_status")
-def get_list(user_id: Annotated[str, Depends(get_current_user_id)],
-             status: VideoStatus):
-    result = storage.get_list_of_video(user_id, status)
-    return result
+@api_router.get("/api/v1/videos")
+def get_videos(current_user: Annotated[UserInDB, Depends(get_current_user)]) -> List[VideoInDB]:
+    return storage.get_videos_for_user(current_user.id)
 
 
-@api_router.put("/api/v1/edit_file_information")
-def edit_file(user_id: Annotated[str, Depends(get_current_user_id)], db_id: int,
-              title: Optional[str] = None,
-              description: Optional[str] = None,
-              target_platforms: Optional[TargetPlatforms] = Form(None),
-              time_to_publish: datetime.datetime = Form(datetime.datetime.now()),
-              ):
+@api_router.get("/api/v1/videos/{video_id}")
+def get_videos(current_user: Annotated[UserInDB, Depends(get_current_user)], video_id) -> VideoInDB:
+    video = storage.get_video_by_id(video_id)
+    if video.owner_id != current_user.id:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="The user is not the owner of the video")
+    return video
 
-    file_data = storage.build_file_data_from_db(db_id)
-    # TODO: add logic for different quantity of parameters changing
-    #  (may be one by one?...or leve previous one if no new)
-    if file_data.status == VideoStatus.WAITING:
-        record_filter = {'_id': db_id}
-        new_value = {'file_data.info.title': title,
-                     'file_data.info.description': description,
-                     'file_data.target_platforms': target_platforms,
-                     'file_data.info.time_to_publish': time_to_publish}
 
-        storage.update_file_data(record_filter=record_filter, new_value=new_value)
+@api_router.put("/api/v1/videos/{video_id}")
+def edit_video(
+        current_user: Annotated[UserInDB, Depends(get_current_user)],
+        video_id: str,
+        new_video: VideoEdit,
+) -> VideoInDB:
+    video = storage.get_video_by_id(video_id)
+    if video.owner_id != current_user.id:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="The user is not the owner of the video")
 
-    # TODO: taking video_id from request.
-    #  finish code
+    if video.status is VideoStatus.UPLOADING:
+        raise HTTPException(status.HTTP_423_LOCKED, detail="Video is not ready")
 
-    elif file_data.status == VideoStatus.UPLOADED:
-        if file_data.target_platforms == [TargetPlatforms.vk]:
-            response = vk_publisher.edit_data(video_id=456239089, new_title=title, new_description=description)
+    new_values = {}
 
-    return response
+    if new_video.info.title:
+        new_values['info.title'] = new_video.info.title
+
+    if new_video.info.description:
+        new_values['info.description'] = new_video.info.description
+
+    if new_video.target_platforms:
+        # TODO: trigger to upload/delete
+        new_values['target_platforms'] = new_video.target_platforms
+
+    if new_video.time_to_publish:
+        new_values['time_to_publish'] = new_video.time_to_publish
+
+    if len(new_values) == 0:
+        # Return an original video if nothing changed
+        return video
+
+    updated_video = storage.update_video(video.id, updated_fields=new_values)
+
+    if video.status == VideoStatus.UPLOADED:
+        # update info
+        for platform in video.target_platforms:
+            # TODO: check if a video was already uploaded
+            PUBLISHERS[platform].edit_video(updated_video)
+
+    return updated_video

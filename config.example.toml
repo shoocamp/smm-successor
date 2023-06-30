@@ -9,3 +9,6 @@ secret_file_path = "PATH_TO_THE_SECRET_FILE"
 
 [vk]
 token = "VK_API_TOKEN"
+
+[auth]
+secret_key = "" # execute `openssl rand -hex 32` to generate
