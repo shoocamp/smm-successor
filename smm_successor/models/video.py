@@ -7,8 +7,8 @@ from pydantic import BaseModel, Field
 
 
 class SocialPlatform(str, Enum):
-    youtube = "YOUTUBE"
     vk = "VK"
+    youtube = "YOUTUBE"
 
 
 class VKVideoInfo(BaseModel):
@@ -17,6 +17,26 @@ class VKVideoInfo(BaseModel):
     direct_link: str
     owner_id: int
     video_id: int
+
+
+class YTVideoInfoSnippet(BaseModel):
+    publishedAt: str # дэйттайм вроде надо будет поставить
+    channelId: str
+    title: str
+    description: str
+    thumbnails: dict
+
+
+class YTVideoInfo(BaseModel):
+    kind: str
+    etag: str
+    id: str
+    snippet: YTVideoInfoSnippet
+    channelTitle: str
+    categoryId: str
+    liveBroadcastContent: str
+    localized: dict
+    status: dict
 
 
 class VideoInfo(BaseModel):
@@ -41,7 +61,7 @@ class Video(VideoEdit):
     owner_id: str
     file_path: Optional[str]
     status: VideoStatus
-    platform_status: Dict[SocialPlatform, Union[VKVideoInfo, dict]]
+    platform_status: Dict[SocialPlatform, Union[VKVideoInfo, YTVideoInfo]]
 
 
 class VideoInDB(Video):

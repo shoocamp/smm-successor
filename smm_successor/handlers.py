@@ -182,3 +182,42 @@ def edit_video(
             PUBLISHERS[platform].edit_video(updated_video)
 
     return updated_video
+
+
+@api_router.put("/api/v1/videos/delete/{video_id}")
+def delete_video(
+        current_user: Annotated[UserInDB, Depends(get_current_user)],
+        video_id: str,
+        youtube: bool = Form(False),
+        vk: bool = Form(False)
+):
+
+    target_platforms = []
+    if vk:
+        target_platforms.append(SocialPlatform.vk)
+    if youtube:
+        target_platforms.append(SocialPlatform.youtube)
+
+    video_in_db = storage.get_video_by_id(video_id)
+
+    if video_in_db.owner_id != current_user.id:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="The user is not the owner of the video")
+
+    if video_in_db.status is VideoStatus.UPLOADING:
+        raise HTTPException(status.HTTP_423_LOCKED, detail="Video is not ready")
+
+    for platform in target_platforms:
+        logger.info(f"Deleting video (id: {video_in_db.id}, user_id: {video_in_db.owner_id}) from {platform}")
+
+        # deleting
+        platform_status = PUBLISHERS[platform].delete_video(video_in_db)
+
+        video_in_db.platform_status[platform] = platform_status
+        storage.update_video(video_in_db.id, {"platform_status": video_in_db.platform_status})
+
+        logger.info(f"Video (id: {video_in_db.id}, user_id: {video_in_db.owner_id}) deleted from {platform} ")
+
+    # # set a video status
+    # storage.update_video(videoid, {"status": VideoStatus.UPLOADED})
+
+    return video_in_db
