@@ -27,6 +27,10 @@ class Publisher:
     def delete_video(self, video: VideoInDB) -> Dict:
         ...
 
+    @property
+    def platform(self) -> SocialPlatform:
+        raise NotImplemented
+
 
 class YoutubePublisher(Publisher):
     SCOPES = ["https://www.googleapis.com/auth/youtube.upload",
@@ -34,6 +38,11 @@ class YoutubePublisher(Publisher):
 
     def __init__(self, client_secrets_file):
         self.client_secrets_file = client_secrets_file
+        self._platform = SocialPlatform.youtube
+
+    @property
+    def platform(self) -> SocialPlatform:
+        return self._platform
 
     def get_creds(self):
         api_service_name = "youtube"
@@ -118,8 +127,8 @@ class YoutubePublisher(Publisher):
         os.environ["OAUTHLIB_INSECURE_TRANSPORT"] = "1"
         youtube = self.get_creds()
         request = youtube.videos().delete(
-                id=video.platform_status[SocialPlatform.youtube]['id']
-            )
+            id=video.platform_status[SocialPlatform.youtube]['id']
+        )
         # TODO: understand what returns from request. i can`t..
         response = request.execute()
         print(response.text)
@@ -134,6 +143,11 @@ class YoutubePublisher(Publisher):
 class VKPublisher(Publisher):
     def __init__(self, token):
         self.token = token
+        self._platform = SocialPlatform.youtube
+
+    @property
+    def platform(self) -> SocialPlatform:
+        return self._platform
 
     def upload(self, video: VideoInDB) -> VKVideoInfo:
         url = 'https://api.vk.com/method/video.save'
@@ -157,7 +171,6 @@ class VKPublisher(Publisher):
             raise HTTPException(502, f"Error while uploading video: '{response.text}'")
 
         logger.info(f"[VK] '{video.file_path}' uploaded")
-
 
         return response.json()
 
