@@ -158,7 +158,6 @@ class VKPublisher(Publisher):
 
         logger.info(f"[VK] '{video.file_path}' uploaded")
 
-
         return response.json()
 
     def edit_video(self, video: VideoInDB) -> VideoInDB:
