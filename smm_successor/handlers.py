@@ -15,6 +15,7 @@ from smm_successor.db import Storage
 from smm_successor.models.user import UserInDB, BaseUser
 from smm_successor.models.video import SocialPlatform, VideoStatus, Video, VideoInfo, VideoInDB, VideoEdit
 from smm_successor.publishers import YoutubePublisher, VKPublisher
+from smm_successor.tasks import upload_video_worker
 
 logger = logging.getLogger(__name__)
 
@@ -113,17 +114,14 @@ def upload_video(
         # set a video status
         storage.update_video(video_in_db.id, {"status": VideoStatus.UPLOADING})
 
-        # upload
-        platform_status = PUBLISHERS[platform].upload(video_in_db)
+        # add upload task
+        upload_video_worker.delay(platform, video_in_db.dict())
 
-        # update platform specific status
-        video_in_db.platform_status[platform] = platform_status
-        storage.update_video(video_in_db.id, {"platform_status": video_in_db.platform_status})
-
-        logger.info(f"Video (id: {video_in_db.id}, user_id: {video_in_db.owner_id}) uploaded to {platform} ")
+        logger.info(f"Task for video (id: {video_in_db.id}, user_id: {video_in_db.owner_id})"
+                    f" to upload to {platform} added")
 
     # set a video status
-    storage.update_video(video_in_db.id, {"status": VideoStatus.UPLOADED})
+    # storage.update_video(video_in_db.id, {"status": VideoStatus.UPLOADED})
 
     return video_in_db
 
@@ -182,3 +180,42 @@ def edit_video(
             PUBLISHERS[platform].edit_video(updated_video)
 
     return updated_video
+
+
+@api_router.put("/api/v1/videos/delete/{video_id}")
+def delete_video(
+        current_user: Annotated[UserInDB, Depends(get_current_user)],
+        video_id: str,
+        youtube: bool = Form(False),
+        vk: bool = Form(False)
+):
+
+    target_platforms = []
+    if vk:
+        target_platforms.append(SocialPlatform.vk)
+    if youtube:
+        target_platforms.append(SocialPlatform.youtube)
+
+    video_in_db = storage.get_video_by_id(video_id)
+
+    if video_in_db.owner_id != current_user.id:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="The user is not the owner of the video")
+
+    if video_in_db.status is VideoStatus.UPLOADING:
+        raise HTTPException(status.HTTP_423_LOCKED, detail="Video is not ready")
+
+    for platform in target_platforms:
+        logger.info(f"Deleting video (id: {video_in_db.id}, user_id: {video_in_db.owner_id}) from {platform}")
+
+        # deleting
+        platform_status = PUBLISHERS[platform].delete_video(video_in_db)
+
+        video_in_db.platform_status[platform] = platform_status
+        storage.update_video(video_in_db.id, {"platform_status": video_in_db.platform_status})
+
+        logger.info(f"Video (id: {video_in_db.id}, user_id: {video_in_db.owner_id}) deleted from {platform} ")
+
+    # # set a video status
+    # storage.update_video(videoid, {"status": VideoStatus.UPLOADED})
+
+    return video_in_db

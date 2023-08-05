@@ -12,30 +12,39 @@ from google.oauth2.credentials import Credentials
 from google_auth_oauthlib.flow import InstalledAppFlow
 from googleapiclient.http import MediaFileUpload
 
-from smm_successor.models.video import VideoInDB, SocialPlatform, VKVideoInfo
+from smm_successor.models.video import VideoInDB, SocialPlatform, VKVideoInfo, YTVideoInfo
 
 logger = logging.getLogger(__name__)
 
 
 class Publisher:
-    def upload(self, video: VideoInDB) -> Union[VKVideoInfo, Dict]:
+    def upload(self, video: VideoInDB) -> Union[VKVideoInfo, YTVideoInfo]:
         ...
 
     def edit_video(self, video: VideoInDB) -> VideoInDB:
         ...
 
+    def delete_video(self, video: VideoInDB) -> Dict:
+        ...
+
+    @property
+    def platform(self) -> SocialPlatform:
+        raise NotImplemented
+
 
 class YoutubePublisher(Publisher):
-    SCOPES = ["https://www.googleapis.com/auth/youtube.upload"]
+    SCOPES = ["https://www.googleapis.com/auth/youtube.upload",
+              "https://www.googleapis.com/auth/youtube.force-ssl"]
 
     def __init__(self, client_secrets_file):
         self.client_secrets_file = client_secrets_file
+        self._platform = SocialPlatform.youtube
 
-    def upload(self, video: VideoInDB) -> dict:
-        # Disable OAuthlib's HTTPS verification when running locally.
-        # *DO NOT* leave this option enabled in production.
-        os.environ["OAUTHLIB_INSECURE_TRANSPORT"] = "1"
+    @property
+    def platform(self) -> SocialPlatform:
+        return self._platform
 
+    def get_creds(self):
         api_service_name = "youtube"
         api_version = "v3"
 
@@ -59,7 +68,13 @@ class YoutubePublisher(Publisher):
                 token.write(creds.to_json())
         youtube = googleapiclient.discovery.build(
             api_service_name, api_version, credentials=creds)
+        return youtube
 
+    def upload(self, video: VideoInDB) -> YTVideoInfo:
+        # Disable OAuthlib's HTTPS verification when running locally.
+        # *DO NOT* leave this option enabled in production.
+        os.environ["OAUTHLIB_INSECURE_TRANSPORT"] = "1"
+        youtube = self.get_creds()
         request = youtube.videos().insert(
             part="snippet,status",
             body={
@@ -86,12 +101,53 @@ class YoutubePublisher(Publisher):
         return response
 
     def edit_video(self, video: VideoInDB):
-        logger.warning("Video editing for YouTube not implemented yet")
+        os.environ["OAUTHLIB_INSECURE_TRANSPORT"] = "1"
+        youtube = self.get_creds()
+        # TODO seems like we need to describe YT VideoInfo model with all attributes
+        request = youtube.videos().update(
+            part="snippet",
+            body={
+                "id": video.platform_status[SocialPlatform.youtube]['id'],
+                "snippet": {
+                    "title": video.info.title,
+                    "description": video.info.description,
+                    "categoryId": video.platform_status[SocialPlatform.youtube]['snippet']["categoryId"]
+                }
+            }
+        )
+
+        response = request.execute()
+        # TODO: solve exception
+        if googleapiclient.errors.HttpError:
+            raise HTTPException(502, f"Error while updating video: '{response}'")
+
+        return video
+
+    def delete_video(self, video: VideoInDB):
+        os.environ["OAUTHLIB_INSECURE_TRANSPORT"] = "1"
+        youtube = self.get_creds()
+        request = youtube.videos().delete(
+            id=video.platform_status[SocialPlatform.youtube]['id']
+        )
+        # TODO: understand what returns from request. i can`t..
+        response = request.execute()
+        print(response.text)
+        print(response.json)
+        # TODO: solve exception
+        # if googleapiclient.errors.HttpError:
+        #     raise HTTPException(502, f"Error while deleting video: '{response}'")
+
+        return response
 
 
 class VKPublisher(Publisher):
     def __init__(self, token):
         self.token = token
+        self._platform = SocialPlatform.youtube
+
+    @property
+    def platform(self) -> SocialPlatform:
+        return self._platform
 
     def upload(self, video: VideoInDB) -> VKVideoInfo:
         url = 'https://api.vk.com/method/video.save'
@@ -133,3 +189,19 @@ class VKPublisher(Publisher):
             raise HTTPException(502, f"Error while updating video: '{response.text}'")
 
         return video
+
+    def delete_video(self, video: VideoInDB) -> VideoInDB:
+        url = 'https://api.vk.com/method/video.delete'
+        print(video.platform_status[SocialPlatform.vk].video_id)
+        params = {
+            'video_id': f'{video.platform_status[SocialPlatform.vk].video_id}',
+            'access_token': f'{self.token}',
+            'v': '5.131'
+        }
+
+        response = requests.post(url, params=params)
+        print(response.text)
+        # if not response.ok:
+        #     raise HTTPException(502, f"Error while deleting video: '{response.text}'")
+
+        return response
