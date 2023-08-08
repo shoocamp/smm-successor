@@ -24,6 +24,10 @@ class YTVideoInfoSnippet(BaseModel):
     title: str
     description: str
     thumbnails: dict
+    channelTitle: str
+    categoryId: str
+    liveBroadcastContent: str
+    localized: dict
 
 
 class YTVideoInfo(BaseModel):
@@ -31,10 +35,6 @@ class YTVideoInfo(BaseModel):
     etag: str
     id: str
     snippet: YTVideoInfoSnippet
-    channelTitle: str
-    categoryId: str
-    liveBroadcastContent: str
-    localized: dict
     status: dict
 
 
