@@ -1,0 +1,21 @@
+services:
+  smm-web:
+    build:
+      dockerfile: smm-web.dockerfile
+      context: .
+    ports:
+      - "8000:8000"
+
+  smm-celery:
+    build:
+      dockerfile: celery.dockerfile
+      context: .
+
+  mongo:
+    image: mongo
+    environment:
+      - MONGO_INITDB_ROOT_USERNAME=mongoadmin
+      - MONGO_INITDB_ROOT_PASSWORD=secret
+
+  smm-redis:
+    image: "redis:alpine"

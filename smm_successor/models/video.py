@@ -19,7 +19,7 @@ class VKVideoInfo(BaseModel):
 
 
 class YTVideoInfoSnippet(BaseModel):
-    publishedAt: str # дэйттайм вроде надо будет поставить
+    publishedAt: str
     channelId: str
     title: str
     description: str
